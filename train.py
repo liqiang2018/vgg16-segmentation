@@ -52,7 +52,7 @@ image_tensor, orig_img_tensor, annotation_tensor = tf.cond(is_training_placehold
 
 feed_dict_to_use = {is_training_placeholder: True}
 
-upsample_factor = 16
+upsample_factor = 8 #16
 number_of_classes = 21
 
 log_folder = os.path.join(FLAGS.output_dir, 'train')
@@ -106,16 +106,38 @@ upsampled_logits = tf.nn.conv2d_transpose(logits, upsample_filter_tensor_x2,
 
 upsampled_logits = upsampled_logits + aux_logits_16s
 
-upsample_filter_np_x16 = bilinear_upsample_weights(upsample_factor,
+'''upsample_filter_np_x16 = bilinear_upsample_weights(upsample_factor,
                                                    number_of_classes)
 
 upsample_filter_tensor_x16 = tf.Variable(upsample_filter_np_x16, name='vgg_16/fc8/t_conv_x16')
 upsampled_logits = tf.nn.conv2d_transpose(upsampled_logits, upsample_filter_tensor_x16,
                                           output_shape=upsampled_logits_shape,
                                           strides=[1, upsample_factor, upsample_factor, 1],
+                                          padding='SAME')'''
+#######################code start####################
+pool3_feature = end_points['vgg_16/pool3']
+with tf.variable_scope('vgg_16/fc8'):
+    aux_logits_8s = slim.conv2d(pool3_feature, number_of_classes, [1, 1],
+                                 activation_fn=None,
+                                 weights_initializer=tf.zeros_initializer,
+                                 scope='conv_pool3')
+
+upsampled_logits = tf.nn.conv2d_transpose(upsampled_logits, upsample_filter_tensor_x2,
+                                          output_shape=tf.shape(aux_logits_8s),
+                                          strides=[1, 2, 2, 1],
                                           padding='SAME')
 
 
+upsampled_logits = upsampled_logits + aux_logits_8s
+upsample_filter_np_x8 = bilinear_upsample_weights(upsample_factor,
+                                                   number_of_classes)
+
+upsample_filter_tensor_x8 = tf.Variable(upsample_filter_np_x8, name='vgg_16/fc8/t_conv_x8')
+upsampled_logits = tf.nn.conv2d_transpose(upsampled_logits, upsample_filter_tensor_x8,
+                                          output_shape=upsampled_logits_shape,
+                                          strides=[1, upsample_factor, upsample_factor, 1],
+                                          padding='SAME')
+#######################code end######################
 lbl_onehot = tf.one_hot(annotation_tensor, number_of_classes)
 cross_entropies = tf.nn.softmax_cross_entropy_with_logits(logits=upsampled_logits,
                                                           labels=lbl_onehot)
@@ -191,8 +213,13 @@ summary_string_writer = tf.summary.FileWriter(log_folder)
 # Create the log folder if doesn't exist yet
 if not os.path.exists(log_folder):
     os.makedirs(log_folder)
-
+print("======111=======")
+print(log_folder)
+print(FLAGS.output_dir)
+print(FLAGS.dataset_train)
+print(FLAGS.checkpoint_path)
 checkpoint_path = tf.train.latest_checkpoint(log_folder)
+print("======222======")
 continue_train = False
 if checkpoint_path:
     tf.logging.info(
