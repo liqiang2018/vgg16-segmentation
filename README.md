@@ -1,2 +1,1 @@
-# vgg16-segmentation
-https://gitee.com/ai100/quiz-w9-code
+作业说明见作业说明.docx
